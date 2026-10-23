@@ -141,7 +141,7 @@ static void handleRoot() {
           "e.innerHTML='<span class=\"status '+(ok?'ok':'warn')+'\">'+t+'</span>';}"
           "function db(v){return v<=-99?'none':v.toFixed(1)+' dB';}"
           "function poll(){fetch('/api/status').then(function(r){return r.json();}).then(function(s){"
-          "st('voter',s.voter,s.voter=='CONNECTED');st('host',s.host);st('sent',s.sent);"
+          "st('voter',s.voter,s.voter.indexOf('CONNECTED')==0);st('host',s.host);st('sent',s.sent);"
           "st('cos',s.cos?'OPEN':'closed',s.cos);st('rssi',s.rssi+(s.hwrssi?' (hardware)':' (DSP)'));"
           "st('noise',s.noise);st('rssiraw',s.rssiraw);"
           "st('adcpk',db(s.adcpk)+' FS');st('encpk',db(s.encpk),s.encpk<-1);"
@@ -165,6 +165,8 @@ static float peakDb(int16_t peak, float ref) {
 }
 
 static void handleApiStatus() {
+  char voterState[96];
+  voter.statusText(voterState, sizeof(voterState));
   char lat[16] = "", lon[16] = "", elev[16] = "";
   gps.getGPSStrings(lat, lon, elev);
 
@@ -197,7 +199,7 @@ static void handleApiStatus() {
            "\"gps\":\"%s\",\"sats\":%lu,\"utc\":\"%s\",\"jit\":%lu,"
            "\"lat\":\"%s\",\"lon\":\"%s\",\"elev\":\"%s\","
            "\"iface\":\"%s\",\"ip\":\"%s\",\"link\":\"%s\",\"up\":%lu,\"heap\":%lu}",
-           VoterClient::stateStr(voter.getState()), jsonEscape(host.c_str()).c_str(),
+           jsonEscape(voterState).c_str(), jsonEscape(host.c_str()).c_str(),
            (unsigned long)voter.getAudioFramesSent(), g_status.cos ? "true" : "false",
            (unsigned)g_status.rssi, cfg.data.useHwRSSI ? "true" : "false",
            (unsigned)g_status.rssiRaw, (unsigned)g_status.noise, peakDb(g_status.adcPeak, 32768.0f),
@@ -286,7 +288,7 @@ static void handleRadio() {
   html += "<p>Set the analog level with the input divider first, then trim with Digital Gain.</p>";
   html += "<label>Digital Gain (%):</label><input type=\"number\" min=\"0\" max=\"255\" name=\"rxDigitalGain\" value=\"" + String(cfg.data.rxDigitalGainPct) + "\">";
   html += checkbox("deemp", cfg.data.enableDeemp, "De-emphasis (use with flat/discriminator audio)");
-  html += checkbox("plFilter", cfg.data.enablePLFilter, "PL Filter (300-2400 Hz voice bandpass)");
+  html += checkbox("plFilter", cfg.data.enablePLFilter, "PL Filter (removes CTCSS tones below 290 Hz)");
   html += "<input type=\"submit\" value=\"Save &amp; Reboot\" class=\"btn\"></form></div>";
   html += htmlFooter();
   webServer.send(200, "text/html", html);

@@ -21,7 +21,7 @@ Receive audio goes straight into the ESP32's ADC1, the same way the original VOT
 **Removed (TX side):** PTT, jitter buffer, upsampler, uLaw decode, TX gain, test tone, PTT tail.
 **RSSI:** selectable on the Radio page.
 - **DSP noise RSSI** (default) needs nothing extra. Same method as Voter2.
-- **Hardware RSSI** reads a voltage on IO39 (ADC1_CH3), sampled in the same DMA stream as audio, averaged per 20 ms frame, and mapped from the calibrated Min/Max to 0-127. On the CDM 1250 this is accessory pin 15.
+- **Hardware RSSI** reads a voltage on IO39 (ADC1_CH3), sampled in the same DMA stream as audio, averaged per 20 ms frame, and mapped from the calibrated Min/Max to 0-255. On the CDM 1250 this is accessory pin 15.
 
 ### Code layout
 ```

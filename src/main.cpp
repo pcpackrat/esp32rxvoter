@@ -88,15 +88,19 @@ static void audioTask(void *arg) {
         adcPeak = a;
     }
 
-    uint8_t baseRSSI = dsp.process(pcm, cfg.data.enablePLFilter, cfg.data.enableDeemp);
+    // The host can ask for flat audio / no PL filter (voter.conf nodeemp,
+    // hostdeemp, noplfilter) - its request wins over the local setting
+    uint8_t baseRSSI = dsp.process(pcm, cfg.data.enablePLFilter && !voter.hostNoPlFilter(),
+                                   cfg.data.enableDeemp && !voter.hostFlatAudio());
 
     uint16_t rssiRaw = audioIn.getRssiRaw();
     g_status.rssiRaw = rssiRaw;
     if (cfg.data.useHwRSSI) {
-      // Hardware RSSI: map calibrated ADC range to 0-127 (7-bit, per protocol)
+      // Hardware RSSI: map calibrated ADC range to 0-255, the same scale as the
+      // VOTER boards (chan_voter compares the raw byte)
       long r = constrain((long)rssiRaw, (long)cfg.data.rssiMin, (long)cfg.data.rssiMax);
       baseRSSI = (cfg.data.rssiMax > cfg.data.rssiMin)
-                     ? (uint8_t)map(r, cfg.data.rssiMin, cfg.data.rssiMax, 0, 127)
+                     ? (uint8_t)map(r, cfg.data.rssiMin, cfg.data.rssiMax, 0, 255)
                      : 0;
     }
 
@@ -116,17 +120,19 @@ static void audioTask(void *arg) {
 
     dsp.encodeULaw(pcm, frame.ulaw, AUDIO_FRAME_SAMPLES);
 
-    // Squelch. Open squelch sets bit 7 and keeps the RSSI in bits 0-6.
-    uint8_t finalRSSI = baseRSSI;
+    // Squelch. RSSI 0 means squelched (no audio), so an open squelch always
+    // sends at least 1.
+    const uint8_t openRSSI = baseRSSI ? baseRSSI : 1;
+    uint8_t finalRSSI = openRSSI;
     bool active = true;
     switch (cfg.data.cosMode) {
     case COS_MODE_HARDWARE:
       active = cosInputActive();
-      finalRSSI = active ? ((baseRSSI & 0x7F) | 0x80) : 0;
+      finalRSSI = active ? openRSSI : 0;
       break;
     case COS_MODE_DSP:
       active = dsp.getNoiseLevel() < cfg.data.dspSquelchThresh;
-      finalRSSI = active ? ((baseRSSI & 0x7F) | 0x80) : 0;
+      finalRSSI = active ? openRSSI : 0;
       break;
     default: // COS_MODE_ALWAYS_ON
       break;
@@ -140,10 +146,16 @@ static void audioTask(void *arg) {
     if (sending) {
       tailCount = TAIL_FRAMES;
     }
-    if (sending || tailCount > 0) {
+    // Master (host option SENDALWAYS): a frame every 20 ms, RSSI 0 + silence
+    // when squelched - the host's timebase comes from this stream.
+    bool sendAlways = voter.sendAlways();
+    if (sending || tailCount > 0 || sendAlways) {
       if (!sending) {
         finalRSSI = 0; // Tail frame clears the server decoder
-        tailCount--;
+        if (tailCount > 0)
+          tailCount--;
+        else
+          memset(frame.ulaw, 0xFF, sizeof(frame.ulaw)); // uLaw silence
       }
       frame.rssi = finalRSSI;
       frame.time = {0, 0};
@@ -260,8 +272,10 @@ static void printStatus() {
   Serial.println("----------------------------------------");
   Serial.printf(" %s v%s (%s)\r\n", FIRMWARE_NAME, FIRMWARE_VERSION, BUILD_DATE);
   Serial.printf(" Network : %s %s\r\n", net.modeStr(), net.localIP().toString().c_str());
+  char voterState[96];
+  voter.statusText(voterState, sizeof(voterState));
   Serial.printf(" Voter   : %s -> %s:%u, frames sent %lu\r\n",
-                VoterClient::stateStr(voter.getState()), voter.getHostIP().toString().c_str(),
+                voterState, voter.getHostIP().toString().c_str(),
                 cfg.data.hostPort, (unsigned long)voter.getAudioFramesSent());
   Serial.printf(" GPS     : %s, sats %lu, PPS jitter %lu us\r\n",
                 GPSManager::statusStr(gps.getLockStatus()), (unsigned long)gps.getSatellites(),

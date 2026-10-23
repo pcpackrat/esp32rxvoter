@@ -123,7 +123,7 @@ GND ───────────────────┴─────�
 | R12 / R13 | 10k / 8.2k | 5 V max RSSI → 2.25 V at the pin. ADC range is about 0.15-2.45 V. For RSSI ≤ 2.4 V, fit R12 = 1k and leave R13 out |
 | C5 | 100 nF | Smooths the RSSI voltage (~0.5 ms). The firmware also averages over each 20 ms frame |
 
-**Calibrate:** on the Status page, read "RSSI pin (raw counts)" with no signal → enter it as RSSI Min. Read it again with a full-quieting signal → enter it as RSSI Max. Then tick "Use Hardware RSSI" (Radio page). Readings between Min and Max map to RSSI 0-127.
+**Calibrate:** on the Status page, read "RSSI pin (raw counts)" with no signal → enter it as RSSI Min. Read it again with a full-quieting signal → enter it as RSSI Max. Then tick "Use Hardware RSSI" (Radio page). Readings between Min and Max map to RSSI 0-255.
 
 ### 4.4 CDM 1250 accessory connector
 

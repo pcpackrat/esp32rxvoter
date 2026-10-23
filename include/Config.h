@@ -31,7 +31,7 @@ struct SysConfig {
   float dspCalib;
   bool useHwRSSI;    // RSSI from the IO39 ADC instead of DSP noise
   uint16_t rssiMin;  // Raw ADC counts (0-4095) mapped to RSSI 0
-  uint16_t rssiMax;  // Raw ADC counts mapped to RSSI 127
+  uint16_t rssiMax;  // Raw ADC counts mapped to RSSI 255
   uint8_t rxDigitalGainPct;
   bool enablePLFilter;
   bool enableDeemp;
